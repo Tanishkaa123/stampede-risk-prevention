@@ -1,0 +1,257 @@
+import type { Zone, Alert, AdminProfile, AdminTask, Route } from '@/types'
+
+export const mockZones: Zone[] = [
+  {
+    id: 'z1',
+    name: 'Main Gate A',
+    status: 'red',
+    density_percent: 91,
+    capacity: 500,
+    current_count: 455,
+    lat: 28.6139,
+    lng: 77.2090,
+    radius: 200,
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'z2',
+    name: 'Central Plaza',
+    status: 'yellow',
+    density_percent: 67,
+    capacity: 800,
+    current_count: 536,
+    lat: 28.6160,
+    lng: 77.2110,
+    radius: 300,
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'z3',
+    name: 'East Corridor',
+    status: 'green',
+    density_percent: 30,
+    capacity: 400,
+    current_count: 120,
+    lat: 28.6120,
+    lng: 77.2140,
+    radius: 180,
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'z4',
+    name: 'West Exit',
+    status: 'green',
+    density_percent: 22,
+    capacity: 300,
+    current_count: 66,
+    lat: 28.6145,
+    lng: 77.2060,
+    radius: 150,
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'z5',
+    name: 'Food Court',
+    status: 'yellow',
+    density_percent: 59,
+    capacity: 600,
+    current_count: 354,
+    lat: 28.6170,
+    lng: 77.2075,
+    radius: 220,
+    updated_at: new Date().toISOString(),
+  },
+]
+
+export const mockAlerts: Alert[] = [
+  {
+    id: 'a1',
+    type: 'stampede_risk',
+    zone_id: 'z1',
+    zone_name: 'Main Gate A',
+    message: 'Crowd density has exceeded 90%. Risk of stampede. Redirect crowd immediately.',
+    severity: 'critical',
+    created_at: new Date(Date.now() - 4 * 60 * 1000).toISOString(),
+    resolved: false,
+  },
+  {
+    id: 'a2',
+    type: 'red_zone',
+    zone_id: 'z1',
+    zone_name: 'Main Gate A',
+    message: 'Zone classified RED. Restrict further entry.',
+    severity: 'high',
+    created_at: new Date(Date.now() - 12 * 60 * 1000).toISOString(),
+    resolved: false,
+  },
+  {
+    id: 'a3',
+    type: 'medical_emergency',
+    zone_id: 'z2',
+    zone_name: 'Central Plaza',
+    message: 'Medical emergency reported near fountain. Medical team deployed.',
+    severity: 'high',
+    created_at: new Date(Date.now() - 25 * 60 * 1000).toISOString(),
+    resolved: false,
+  },
+  {
+    id: 'a4',
+    type: 'lost_child',
+    zone_id: 'z3',
+    zone_name: 'East Corridor',
+    message: 'Lost child — Age 7, wearing red shirt. Last seen East Corridor.',
+    severity: 'medium',
+    created_at: new Date(Date.now() - 40 * 60 * 1000).toISOString(),
+    resolved: false,
+  },
+]
+
+export const mockAdmins: AdminProfile[] = [
+  {
+    id: 'adm1',
+    name: 'Rajan Sharma',
+    email: 'rajan@sas.gov',
+    role: 'admin',
+    zone_id: 'z1',
+    zone_name: 'Main Gate A',
+    gps_lat: 28.6141,
+    gps_lng: 77.2092,
+    online: true,
+    tasks_assigned: 24,
+    tasks_completed: 21,
+    tasks_rejected: 1,
+    avg_response_seconds: 42,
+  },
+  {
+    id: 'adm2',
+    name: 'Priya Verma',
+    email: 'priya@sas.gov',
+    role: 'admin',
+    zone_id: 'z2',
+    zone_name: 'Central Plaza',
+    gps_lat: 28.6162,
+    gps_lng: 77.2112,
+    online: true,
+    tasks_assigned: 18,
+    tasks_completed: 17,
+    tasks_rejected: 0,
+    avg_response_seconds: 28,
+  },
+  {
+    id: 'adm3',
+    name: 'Suresh Kumar',
+    email: 'suresh@sas.gov',
+    role: 'admin',
+    zone_id: 'z3',
+    zone_name: 'East Corridor',
+    gps_lat: 28.6122,
+    gps_lng: 77.2142,
+    online: false,
+    tasks_assigned: 15,
+    tasks_completed: 11,
+    tasks_rejected: 3,
+    avg_response_seconds: 80,
+  },
+  {
+    id: 'adm4',
+    name: 'Anjali Singh',
+    email: 'anjali@sas.gov',
+    role: 'admin',
+    zone_id: 'z4',
+    zone_name: 'West Exit',
+    gps_lat: 28.6147,
+    gps_lng: 77.2062,
+    online: true,
+    tasks_assigned: 20,
+    tasks_completed: 19,
+    tasks_rejected: 0,
+    avg_response_seconds: 19,
+  },
+]
+
+export const mockTasks: AdminTask[] = [
+  {
+    id: 't1',
+    instruction: 'Deploy 4 personnel to Main Gate A immediately. Control crowd flow entering the zone.',
+    zone_id: 'z1',
+    zone_name: 'Main Gate A',
+    assigned_to: 'adm1',
+    assigned_by: 'superadmin',
+    status: 'pending',
+    created_at: new Date(Date.now() - 3 * 60 * 1000).toISOString(),
+    responded_at: null,
+  },
+  {
+    id: 't2',
+    instruction: 'Open alternate exit route via West side. Guide crowd from Central Plaza.',
+    zone_id: 'z2',
+    zone_name: 'Central Plaza',
+    assigned_to: 'adm1',
+    assigned_by: 'superadmin',
+    status: 'accepted',
+    created_at: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
+    responded_at: new Date(Date.now() - 13 * 60 * 1000).toISOString(),
+  },
+  {
+    id: 't3',
+    instruction: 'Verify crowd count in East Corridor and submit head count report.',
+    zone_id: 'z3',
+    zone_name: 'East Corridor',
+    assigned_to: 'adm1',
+    assigned_by: 'superadmin',
+    status: 'completed',
+    created_at: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+    responded_at: new Date(Date.now() - 58 * 60 * 1000).toISOString(),
+  },
+]
+
+export const mockRoutes: Route[] = [
+  {
+    id: 'r1',
+    name: 'Via East Corridor',
+    from_zone: 'Main Gate A',
+    to_zone: 'West Exit',
+    distance_km: 0.4,
+    time_minutes: 6,
+    crowd_score: 28,
+    route_score: 18,
+    safe: true,
+  },
+  {
+    id: 'r2',
+    name: 'Via Food Court',
+    from_zone: 'Main Gate A',
+    to_zone: 'West Exit',
+    distance_km: 0.3,
+    time_minutes: 5,
+    crowd_score: 62,
+    route_score: 45,
+    safe: false,
+  },
+  {
+    id: 'r3',
+    name: 'Via Central Plaza',
+    from_zone: 'Main Gate A',
+    to_zone: 'West Exit',
+    distance_km: 0.7,
+    time_minutes: 11,
+    crowd_score: 70,
+    route_score: 58,
+    safe: false,
+  },
+]
+
+export function timeAgo(iso: string): string {
+  const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
+  if (diff < 60) return `${diff}s ago`
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
+  return `${Math.floor(diff / 3600)}h ago`
+}
+
+export function getPerformanceScore(a: AdminProfile): number {
+  return Math.round(
+    (a.tasks_completed * 4 + (a.tasks_assigned > 0 ? (a.tasks_completed / a.tasks_assigned) * 20 : 0)) -
+    a.tasks_rejected * 3 -
+    Math.min(a.avg_response_seconds / 10, 10)
+  )
+}
