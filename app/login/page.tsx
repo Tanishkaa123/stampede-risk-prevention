@@ -53,7 +53,7 @@ export default function LoginPage() {
         .eq('id', data.user.id)
         .single()
 
-      if (!profile || profile.role !== role) {
+      if (!profile || (profile as { role: string }).role !== role) {
         await supabase.auth.signOut()
         setLoading(false)
         setError(`This account does not have ${roleConfig[role].label} access.`)
