@@ -1,11 +1,12 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import {
   AlertTriangle, Map, LayoutDashboard, ClipboardList,
   Users, FileText, Bell, LogOut, Radio
 } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
 
 const adminNav = [
   { href: '/admin', label: 'Overview', icon: LayoutDashboard },
@@ -32,7 +33,14 @@ interface Props {
 
 export default function AdminSidebar({ role = 'admin', userName = 'Admin', zoneName }: Props) {
   const pathname = usePathname()
+  const router = useRouter()
   const navItems = role === 'superadmin' ? superNav : adminNav
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    router.push('/')
+    router.refresh()
+  }
 
   return (
     <aside className="w-56 shrink-0 flex flex-col bg-[#111111] border-r border-[#1f1f1f] min-h-screen">
@@ -77,13 +85,13 @@ export default function AdminSidebar({ role = 'admin', userName = 'Admin', zoneN
             {role === 'superadmin' ? 'Super Admin' : 'Administrator'}
           </p>
         </div>
-        <Link
-          href="/login"
-          className="flex items-center gap-2 px-2 py-1.5 rounded text-xs text-[#666] hover:text-[#aaa] transition-colors mt-1"
+        <button
+          onClick={handleLogout}
+          className="flex items-center gap-2 px-2 py-1.5 rounded text-xs text-[#666] hover:text-[#dc2626] transition-colors mt-1 w-full"
         >
           <LogOut size={12} />
           Sign out
-        </Link>
+        </button>
       </div>
     </aside>
   )

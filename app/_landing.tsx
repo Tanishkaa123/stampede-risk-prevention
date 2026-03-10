@@ -1,8 +1,22 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import Navbar from '@/components/Navbar'
 import Link from 'next/link'
 import { mockZones, mockAlerts } from '@/lib/mockData'
-import { AlertTriangle, Map, ShieldCheck, Route, Bell, Users, Activity, Lock } from 'lucide-react'
+import { AlertTriangle, Map, ShieldCheck, Route, Bell, Users, Activity, Lock, Eye, EyeOff, CheckCircle } from 'lucide-react'
 import ZoneBadge from '@/components/ZoneBadge'
+import { supabase } from '@/lib/supabase'
+import type { Session } from '@supabase/supabase-js'
+
+type Role = 'user' | 'admin' | 'superadmin'
+
+const roleConfig: Record<Role, { label: string; redirect: string; hint: string }> = {
+  user:       { label: 'User',          redirect: '/map',        hint: 'For public event attendees'    },
+  admin:      { label: 'Administrator', redirect: '/admin',      hint: 'For ground staff & volunteers' },
+  superadmin: { label: 'Super Admin',   redirect: '/superadmin', hint: 'Control room authority only'   },
+}
 
 const features = [
   {
@@ -55,7 +69,93 @@ const steps = [
   },
 ]
 
+type Mode = 'signin' | 'signup'
+
 export default function LandingPage() {
+  const router = useRouter()
+  const [session, setSession] = useState<Session | null>(null)
+  const [role, setRole] = useState<Role>('user')
+  const [mode, setMode] = useState<Mode>('signin')
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [showPass, setShowPass] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [loginError, setLoginError] = useState('')
+  const [success, setSuccess] = useState('')
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setSession(data.session))
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => setSession(s))
+    return () => subscription.unsubscribe()
+  }, [])
+
+  const resetForm = () => { setName(''); setEmail(''); setPassword(''); setLoginError(''); setSuccess('') }
+
+  const handleRoleChange = (r: Role) => {
+    setRole(r)
+    if (r !== 'user') setMode('signin')
+    resetForm()
+  }
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoginError(''); setSuccess('')
+    if (!email || !password) { setLoginError('Please fill in all fields.'); return }
+    setLoading(true)
+
+    const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password })
+    if (authError) { setLoading(false); setLoginError(authError.message); return }
+
+    if (role !== 'user' && data.user) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', data.user.id)
+        .single()
+      if (!profile || (profile as { role: string }).role !== role) {
+        await supabase.auth.signOut()
+        setLoading(false)
+        setLoginError(`This account does not have ${roleConfig[role].label} access.`)
+        return
+      }
+    }
+
+    setLoading(false)
+    router.push(roleConfig[role].redirect)
+  }
+
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoginError(''); setSuccess('')
+    if (!name.trim() || !email || !password) { setLoginError('Please fill in all fields.'); return }
+    if (password.length < 6) { setLoginError('Password must be at least 6 characters.'); return }
+    setLoading(true)
+
+    const { data, error: authError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { name: name.trim() } },
+    })
+    if (authError) { setLoading(false); setLoginError(authError.message); return }
+
+    if (data.user) {
+      // Upsert in case the DB trigger already created the row
+      await supabase.from('profiles').upsert(
+        { id: data.user.id, name: name.trim(), email, role: 'user' } as any,
+        { onConflict: 'id' }
+      )
+    }
+
+    setLoading(false)
+    setSuccess('Account created! Check your email to confirm, then sign in.')
+    setMode('signin')
+    setName('')
+    setPassword('')
+  }
+
+  const isSignUp = mode === 'signup' && role === 'user'
+
   const redCount = mockZones.filter(z => z.status === 'red').length
   const greenCount = mockZones.filter(z => z.status === 'green').length
   const activeAlerts = mockAlerts.filter(a => !a.resolved).length
@@ -74,58 +174,199 @@ export default function LandingPage() {
       )}
 
       {/* Hero */}
-      <section className="max-w-4xl mx-auto px-6 py-20 sm:py-28">
-        <div className="flex items-center gap-2 mb-6">
-          <span className="w-5 h-5 rounded bg-[#dc2626] flex items-center justify-center shrink-0">
-            <ShieldCheck size={11} color="white" />
-          </span>
-          <span className="text-xs uppercase tracking-widest text-[#888] font-medium">
-            Stampede Avoidance System
-          </span>
-        </div>
+      <section className="max-w-6xl mx-auto px-6 py-16 sm:py-24">
+        <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
 
-        <h1 className="text-4xl sm:text-5xl font-semibold tracking-tight text-[#111] leading-tight max-w-2xl">
-          Prevent stampedes before<br />
-          <span className="text-[#dc2626]">they happen.</span>
-        </h1>
+          {/* Left: hero text */}
+          <div>
+            <div className="flex items-center gap-2 mb-6">
+              <span className="w-5 h-5 rounded bg-[#dc2626] flex items-center justify-center shrink-0">
+                <ShieldCheck size={11} color="white" />
+              </span>
+              <span className="text-xs uppercase tracking-widest text-[#888] font-medium">
+                Stampede Avoidance System
+              </span>
+            </div>
 
-        <p className="mt-5 text-lg text-[#555] max-w-xl leading-relaxed">
-          Real-time crowd monitoring, GPS-based zone mapping and smart route guidance
-          for festivals, temples, stadiums and large public events.
-        </p>
+            <h1 className="text-4xl sm:text-5xl font-semibold tracking-tight text-[#111] leading-tight">
+              Prevent stampedes before<br />
+              <span className="text-[#dc2626]">they happen.</span>
+            </h1>
 
-        <div className="flex flex-wrap gap-3 mt-8">
-          <Link href="/map"
-            className="flex items-center gap-2 bg-[#111] text-white text-sm px-5 py-2.5 rounded font-medium hover:bg-[#333] transition-colors">
-            <Map size={14} />
-            View Live Map
-          </Link>
-          <Link href="/login"
-            className="flex items-center gap-2 bg-white border border-[#ddd] text-[#333] text-sm px-5 py-2.5 rounded font-medium hover:border-[#bbb] transition-colors">
-            Login to Dashboard
-          </Link>
-        </div>
+            <p className="mt-5 text-base text-[#555] leading-relaxed">
+              Real-time crowd monitoring, GPS-based zone mapping and smart route guidance
+              for festivals, temples, stadiums and large public events.
+            </p>
 
-        {/* Live status row */}
-        <div className="mt-10 flex flex-wrap items-center gap-4 pt-8 border-t border-[#e4e4e4]">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-[#dc2626] animate-pulse" />
-            <span className="text-sm text-[#555]">
-              <span className="font-mono font-semibold text-[#111]">{redCount}</span> red zone{redCount !== 1 ? 's' : ''}
-            </span>
+            <div className="flex flex-wrap gap-3 mt-7">
+              <Link href="/map"
+                className="flex items-center gap-2 bg-[#111] text-white text-sm px-5 py-2.5 rounded font-medium hover:bg-[#333] transition-colors">
+                <Map size={14} />
+                View Live Map
+              </Link>
+            </div>
+
+            {/* Live status row */}
+            <div className="mt-8 flex flex-wrap items-center gap-4 pt-6 border-t border-[#e4e4e4]">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-[#dc2626] animate-pulse" />
+                <span className="text-sm text-[#555]">
+                  <span className="font-mono font-semibold text-[#111]">{redCount}</span> red zone{redCount !== 1 ? 's' : ''}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-[#16a34a]" />
+                <span className="text-sm text-[#555]">
+                  <span className="font-mono font-semibold text-[#111]">{greenCount}</span> safe zone{greenCount !== 1 ? 's' : ''}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-[#d97706]" />
+                <span className="text-sm text-[#555]">
+                  <span className="font-mono font-semibold text-[#111]">{activeAlerts}</span> active alert{activeAlerts !== 1 ? 's' : ''}
+                </span>
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-[#16a34a]" />
-            <span className="text-sm text-[#555]">
-              <span className="font-mono font-semibold text-[#111]">{greenCount}</span> safe zone{greenCount !== 1 ? 's' : ''}
-            </span>
+
+          {/* Right: inline login / register form — hidden when already logged in */}
+          {session ? (
+            <div className="bg-white border border-[#e4e4e4] rounded-xl p-7 shadow-sm flex flex-col items-center justify-center gap-5 text-center">
+              <div className="w-14 h-14 rounded-full bg-[#f0fdf4] flex items-center justify-center">
+                <ShieldCheck size={26} className="text-[#16a34a]" />
+              </div>
+              <div>
+                <p className="text-base font-semibold text-[#111] mb-1">You&apos;re signed in</p>
+                <p className="text-xs text-[#888]">{session.user.email}</p>
+              </div>
+              <div className="flex flex-col gap-2 w-full">
+                <Link href="/map"
+                  className="w-full flex items-center justify-center gap-2 bg-[#dc2626] text-white text-sm py-2.5 rounded font-medium hover:bg-[#b91c1c] transition-colors">
+                  <Map size={14} />
+                  Open Live Map
+                </Link>
+                <Link href="/dashboard"
+                  className="w-full flex items-center justify-center gap-2 bg-white border border-[#e4e4e4] text-[#333] text-sm py-2.5 rounded font-medium hover:border-[#bbb] transition-colors">
+                  My Dashboard
+                </Link>
+              </div>
+            </div>
+          ) : (
+          <div className="bg-white border border-[#e4e4e4] rounded-xl p-7 shadow-sm">
+            <h2 className="text-lg font-semibold text-[#111] mb-1">
+              {isSignUp ? 'Create account' : 'Sign in'}
+            </h2>
+            <p className="text-xs text-[#888] mb-6">
+              {isSignUp
+                ? 'Register to view live crowd data near your location.'
+                : 'Choose your role and enter your credentials.'}
+            </p>
+
+            {/* Role tabs */}
+            <div className="flex border-b border-[#e4e4e4] mb-5">
+              {(Object.keys(roleConfig) as Role[]).map(r => (
+                <button
+                  key={r}
+                  onClick={() => handleRoleChange(r)}
+                  className={`flex-1 pb-2.5 text-xs font-medium border-b-2 transition-colors -mb-px
+                    ${role === r
+                      ? 'border-[#dc2626] text-[#111]'
+                      : 'border-transparent text-[#888] hover:text-[#555]'}`}
+                >
+                  {roleConfig[r].label}
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] text-[#aaa] mb-4 -mt-2">{roleConfig[role].hint}</p>
+
+            {success && (
+              <div className="flex items-start gap-2 bg-green-50 border border-green-200 text-green-800 text-xs rounded px-3 py-2.5 mb-4">
+                <CheckCircle size={13} className="mt-0.5 shrink-0" />
+                {success}
+              </div>
+            )}
+
+            <form onSubmit={isSignUp ? handleSignUp : handleLogin} className="space-y-4">
+              {isSignUp && (
+                <div>
+                  <label className="block text-xs font-medium text-[#555] mb-1.5">Full name</label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={e => setName(e.target.value)}
+                    placeholder="Your name"
+                    className="w-full border border-[#ddd] rounded px-3 py-2.5 text-sm text-[#111] bg-white
+                      placeholder:text-[#bbb] focus:outline-none focus:border-[#999] transition-colors"
+                  />
+                </div>
+              )}
+              <div>
+                <label className="block text-xs font-medium text-[#555] mb-1.5">Email address</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  className="w-full border border-[#ddd] rounded px-3 py-2.5 text-sm text-[#111] bg-white
+                    placeholder:text-[#bbb] focus:outline-none focus:border-[#999] transition-colors"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-[#555] mb-1.5">Password</label>
+                <div className="relative">
+                  <input
+                    type={showPass ? 'text' : 'password'}
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full border border-[#ddd] rounded px-3 py-2.5 text-sm text-[#111] bg-white
+                      placeholder:text-[#bbb] focus:outline-none focus:border-[#999] transition-colors pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPass(!showPass)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#bbb] hover:text-[#888]"
+                  >
+                    {showPass ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                </div>
+                {isSignUp && <p className="text-[11px] text-[#bbb] mt-1">Minimum 6 characters.</p>}
+              </div>
+
+              {loginError && (
+                <p className="text-xs text-[#dc2626] flex items-center gap-1.5">
+                  <AlertTriangle size={11} /> {loginError}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-[#dc2626] text-white text-sm py-2.5 rounded font-medium
+                  hover:bg-[#b91c1c] transition-colors disabled:opacity-60"
+              >
+                {loading
+                  ? (isSignUp ? 'Creating account…' : 'Signing in…')
+                  : (isSignUp ? 'Create account' : `Sign in as ${roleConfig[role].label}`)}
+              </button>
+            </form>
+
+            {role === 'user' && (
+              <p className="text-xs text-center text-[#aaa] mt-5">
+                {isSignUp ? (
+                  <>Already have an account?{' '}
+                    <button onClick={() => { setMode('signin'); resetForm() }} className="text-[#dc2626] hover:underline font-medium">Sign in</button>
+                  </>
+                ) : (
+                  <>Don&apos;t have an account?{' '}
+                    <button onClick={() => { setMode('signup'); resetForm() }} className="text-[#dc2626] hover:underline font-medium">Create one</button>
+                  </>
+                )}
+              </p>
+            )}
           </div>
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-[#d97706]" />
-            <span className="text-sm text-[#555]">
-              <span className="font-mono font-semibold text-[#111]">{activeAlerts}</span> active alert{activeAlerts !== 1 ? 's' : ''}
-            </span>
-          </div>
+          )}
+
         </div>
       </section>
 
@@ -135,7 +376,7 @@ export default function LandingPage() {
           <div className="flex gap-3 overflow-x-auto pb-1">
             {mockZones.map(zone => (
               <div key={zone.id}
-                className="flex items-center justify-between gap-6 border border-[#e4e4e4] rounded-lg px-4 py-3 min-w-[220px] shrink-0 bg-[#fafafa]">
+                className="flex items-center justify-between gap-6 border border-[#e4e4e4] rounded-lg px-4 py-3 min-w-55 shrink-0 bg-[#fafafa]">
                 <div>
                   <p className="text-xs font-medium text-[#111]">{zone.name}</p>
                   <p className="text-[10px] text-[#888] mt-0.5 font-mono">{zone.density_percent}% capacity</p>

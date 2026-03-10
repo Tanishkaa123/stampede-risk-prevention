@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
-import { MapContainer, TileLayer, Circle, Popup, Marker, Tooltip } from 'react-leaflet'
+import { MapContainer, TileLayer, Circle, Popup, Marker, Tooltip, CircleMarker } from 'react-leaflet'
 import type { Zone, AdminProfile } from '@/types'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
@@ -22,6 +22,7 @@ interface Props {
   zones: Zone[]
   admins?: AdminProfile[]
   center?: [number, number]
+  userLocation?: [number, number]
   showAdmins?: boolean
   height?: string
 }
@@ -30,6 +31,7 @@ export default function CrowdMap({
   zones,
   admins = [],
   center,
+  userLocation,
   showAdmins = false,
   height = '100%',
 }: Props) {
@@ -68,7 +70,7 @@ export default function CrowdMap({
             }}
           >
             <Popup>
-              <div className="min-w-[160px]">
+              <div className="min-w-40">
                 <p className="font-semibold text-sm">{zone.name}</p>
                 <p className="text-xs text-gray-600 mt-1">
                   Density: <strong>{zone.density_percent}%</strong>
@@ -89,6 +91,18 @@ export default function CrowdMap({
             </Tooltip>
           </Circle>
         ))}
+
+        {userLocation && (
+          <CircleMarker
+            center={userLocation}
+            radius={9}
+            pathOptions={{ color: '#2563eb', fillColor: '#3b82f6', fillOpacity: 0.9, weight: 2 }}
+          >
+            <Tooltip direction="top" permanent opacity={0.9}>
+              <span className="text-xs font-medium">You are here</span>
+            </Tooltip>
+          </CircleMarker>
+        )}
 
         {showAdmins && admins.filter(a => a.gps_lat && a.gps_lng).map(admin => (
           <Marker key={admin.id} position={[admin.gps_lat!, admin.gps_lng!]}>

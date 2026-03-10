@@ -1,5 +1,6 @@
 'use client'
 
+import { useRequireAuth } from '@/lib/useRequireAuth'
 import Navbar from '@/components/Navbar'
 import ZoneBadge from '@/components/ZoneBadge'
 import { AlertItem } from '@/components/AlertBanner'
@@ -13,6 +14,15 @@ const userZone = mockZones.find(z => z.status === 'red') ?? mockZones[0]
 const nearbyAlerts = mockAlerts.filter(a => !a.resolved).slice(0, 4)
 
 export default function DashboardPage() {
+  const checking = useRequireAuth()
+  if (checking) {
+    return (
+      <div className="min-h-screen bg-[#f7f6f2] flex items-center justify-center">
+        <div className="w-8 h-8 rounded-full border-[3px] border-[#dc2626] border-t-transparent animate-spin" />
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-[#f7f6f2]">
       <Navbar />
