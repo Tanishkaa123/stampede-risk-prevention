@@ -5,16 +5,17 @@ import Navbar from '@/components/Navbar'
 import ZoneBadge from '@/components/ZoneBadge'
 import { AlertItem } from '@/components/AlertBanner'
 import RouteCard from '@/components/RouteCard'
-import { mockZones, mockAlerts, mockRoutes } from '@/lib/mockData'
+import { mockAlerts, mockRoutes } from '@/lib/mockData'
 import { MapPin, Navigation, RefreshCw } from 'lucide-react'
 import Link from 'next/link'
-
-// Simulate user is in the highest-risk zone
-const userZone = mockZones.find(z => z.status === 'red') ?? mockZones[0]
-const nearbyAlerts = mockAlerts.filter(a => !a.resolved).slice(0, 4)
+import { useLiveZones } from '@/lib/useLiveZones'
 
 export default function DashboardPage() {
   const checking = useRequireAuth()
+  const { zones, loading: zonesLoading, error: zonesError } = useLiveZones()
+  const userZone = zones.find(z => z.status === 'red') ?? zones[0] ?? null
+  const nearbyAlerts = mockAlerts.filter(a => !a.resolved).slice(0, 4)
+
   if (checking) {
     return (
       <div className="min-h-screen bg-[#f7f6f2] flex items-center justify-center">
@@ -28,26 +29,41 @@ export default function DashboardPage() {
       <Navbar />
 
       {/* Status banner */}
-      <div className={`px-4 py-3 flex items-center gap-3 border-b
-        ${userZone.status === 'red'
-          ? 'bg-red-50 border-[#fecaca]'
-          : userZone.status === 'yellow'
-          ? 'bg-yellow-50 border-[#fde68a]'
-          : 'bg-green-50 border-[#bbf7d0]'}`}>
-        <MapPin size={14} className={userZone.status === 'red' ? 'text-[#dc2626]' : 'text-[#888]'} />
-        <span className="text-sm font-medium text-[#111]">
-          Your area: <strong>{userZone.name}</strong>
-        </span>
-        <ZoneBadge status={userZone.status} size="sm" />
-        {userZone.status === 'red' && (
-          <span className="text-xs text-[#dc2626] font-medium ml-auto flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#dc2626] animate-pulse" />
-            Avoid this zone immediately
+      {userZone ? (
+        <div className={`px-4 py-3 flex items-center gap-3 border-b
+          ${userZone.status === 'red'
+            ? 'bg-red-50 border-[#fecaca]'
+            : userZone.status === 'yellow'
+            ? 'bg-yellow-50 border-[#fde68a]'
+            : 'bg-green-50 border-[#bbf7d0]'}`}>
+          <MapPin size={14} className={userZone.status === 'red' ? 'text-[#dc2626]' : 'text-[#888]'} />
+          <span className="text-sm font-medium text-[#111]">
+            Your area: <strong>{userZone.name}</strong>
           </span>
-        )}
-      </div>
+          <ZoneBadge status={userZone.status} size="sm" />
+          {userZone.status === 'red' && (
+            <span className="text-xs text-[#dc2626] font-medium ml-auto flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#dc2626] animate-pulse" />
+              Avoid this zone immediately
+            </span>
+          )}
+        </div>
+      ) : (
+        <div className="px-4 py-3 flex items-center gap-3 border-b bg-zinc-100 border-zinc-200">
+          <MapPin size={14} className="text-zinc-500" />
+          <span className="text-sm font-medium text-zinc-600">
+            {zonesLoading ? 'Loading live density data...' : 'No live zone data available yet.'}
+          </span>
+        </div>
+      )}
 
       <main className="max-w-5xl mx-auto px-4 py-8">
+        {zonesError && (
+          <div className="mb-4 border border-red-200 bg-red-50 rounded-lg px-4 py-3 text-xs text-red-700">
+            {zonesError}
+          </div>
+        )}
+
         <div className="grid lg:grid-cols-3 gap-6">
 
           {/* Left column */}
@@ -63,39 +79,45 @@ export default function DashboardPage() {
                 </button>
               </div>
 
-              <div className="flex items-center gap-4 p-3 bg-[#fafafa] border border-[#e8e8e8] rounded-lg">
-                <div className="w-10 h-10 rounded-lg bg-[#f0f0f0] flex items-center justify-center shrink-0">
-                  <Navigation size={18} className="text-[#555]" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-[#111]">{userZone.name}</p>
-                  <p className="text-xs text-[#888] mt-0.5 font-mono">
-                    {userZone.density_percent}% capacity · {userZone.current_count} people
-                  </p>
-                </div>
-                <ZoneBadge status={userZone.status} />
-              </div>
+              {userZone ? (
+                <>
+                  <div className="flex items-center gap-4 p-3 bg-[#fafafa] border border-[#e8e8e8] rounded-lg">
+                    <div className="w-10 h-10 rounded-lg bg-[#f0f0f0] flex items-center justify-center shrink-0">
+                      <Navigation size={18} className="text-[#555]" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-[#111]">{userZone.name}</p>
+                      <p className="text-xs text-[#888] mt-0.5 font-mono">
+                        {userZone.density_percent}% capacity · {userZone.current_count} people
+                      </p>
+                    </div>
+                    <ZoneBadge status={userZone.status} />
+                  </div>
 
-              {/* Density bar */}
-              <div className="mt-4">
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-[11px] text-[#888]">Current density</span>
-                  <span className="text-[11px] font-mono font-semibold text-[#333]">{userZone.density_percent}%</span>
-                </div>
-                <div className="h-2 rounded-full bg-[#f0f0f0] overflow-hidden">
-                  <div
-                    className={`h-full rounded-full transition-all ${
-                      userZone.status === 'red' ? 'bg-[#dc2626]' :
-                      userZone.status === 'yellow' ? 'bg-[#d97706]' : 'bg-[#16a34a]'}`}
-                    style={{ width: `${userZone.density_percent}%` }}
-                  />
-                </div>
-                <div className="flex justify-between mt-1">
-                  <span className="text-[9px] text-[#ccc]">0%</span>
-                  <span className="text-[9px] text-[#ccc]">50%</span>
-                  <span className="text-[9px] text-[#ccc]">100%</span>
-                </div>
-              </div>
+                  {/* Density bar */}
+                  <div className="mt-4">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[11px] text-[#888]">Current density</span>
+                      <span className="text-[11px] font-mono font-semibold text-[#333]">{userZone.density_percent}%</span>
+                    </div>
+                    <div className="h-2 rounded-full bg-[#f0f0f0] overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all ${
+                          userZone.status === 'red' ? 'bg-[#dc2626]' :
+                          userZone.status === 'yellow' ? 'bg-[#d97706]' : 'bg-[#16a34a]'}`}
+                        style={{ width: `${userZone.density_percent}%` }}
+                      />
+                    </div>
+                    <div className="flex justify-between mt-1">
+                      <span className="text-[9px] text-[#ccc]">0%</span>
+                      <span className="text-[9px] text-[#ccc]">50%</span>
+                      <span className="text-[9px] text-[#ccc]">100%</span>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <p className="text-xs text-zinc-500">Waiting for live zone data...</p>
+              )}
             </section>
 
             {/* Safe routes */}
@@ -117,7 +139,7 @@ export default function DashboardPage() {
             <section>
               <h2 className="text-sm font-semibold text-[#111] mb-3">All Zones</h2>
               <div className="grid sm:grid-cols-2 gap-3">
-                {mockZones.map(zone => (
+                {zones.map(zone => (
                   <div key={zone.id} className="bg-white border border-[#e4e4e4] rounded-lg p-4">
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-xs font-semibold text-[#111]">{zone.name}</p>
@@ -134,6 +156,11 @@ export default function DashboardPage() {
                     <p className="text-[10px] text-[#aaa] font-mono">{zone.density_percent}% · {zone.current_count}/{zone.capacity}</p>
                   </div>
                 ))}
+                {!zonesLoading && zones.length === 0 && (
+                  <div className="col-span-full bg-white border border-[#e4e4e4] rounded-lg p-4 text-xs text-zinc-500">
+                    No zones found in the database.
+                  </div>
+                )}
               </div>
             </section>
           </div>

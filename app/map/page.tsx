@@ -6,9 +6,10 @@ import Navbar from '@/components/Navbar'
 import { AlertBanner } from '@/components/AlertBanner'
 import ZoneBadge from '@/components/ZoneBadge'
 import DynamicMap from '@/components/DynamicMap'
-import { mockZones, mockAlerts, timeAgo } from '@/lib/mockData'
+import { mockAlerts, timeAgo } from '@/lib/mockData'
 import { Layers, Search, X, MapPin } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { useLiveZones } from '@/lib/useLiveZones'
 
 function haversine(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371
@@ -22,13 +23,15 @@ function haversine(lat1: number, lng1: number, lat2: number, lng2: number): numb
 
 export default function MapPage() {
   const router = useRouter()
+  const hasGeolocation = typeof navigator !== 'undefined' && !!navigator.geolocation
   const [authChecking, setAuthChecking] = useState(true)
   const [showAdmins, setShowAdmins] = useState(false)
   const [search, setSearch] = useState('')
   const [dismissedAlerts, setDismissedAlerts] = useState<string[]>([])
   const [panelOpen, setPanelOpen] = useState(true)
-  const [locationState, setLocationState] = useState<'idle' | 'requesting' | 'granted' | 'denied'>('idle')
+  const [locationDenied, setLocationDenied] = useState(false)
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null)
+  const { zones, loading: zonesLoading, error: zonesError } = useLiveZones()
 
   // Auth guard
   useEffect(() => {
@@ -40,21 +43,19 @@ export default function MapPage() {
 
   // Location — only after auth confirmed
   useEffect(() => {
-    if (authChecking) return
-    if (!navigator.geolocation) { setLocationState('denied'); return }
-    setLocationState('requesting')
+    if (authChecking || !hasGeolocation) return
+
     navigator.geolocation.getCurrentPosition(
       pos => {
         setUserCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude })
-        setLocationState('granted')
       },
-      () => setLocationState('denied'),
+      () => setLocationDenied(true),
       { timeout: 10000 }
     )
-  }, [authChecking])
+  }, [authChecking, hasGeolocation])
 
   const nearbyZones = userCoords
-    ? mockZones.filter(z => haversine(userCoords.lat, userCoords.lng, z.lat, z.lng) <= 10)
+    ? zones.filter(z => haversine(userCoords.lat, userCoords.lng, z.lat, z.lng) <= 10)
     : []
 
   const activeAlerts = mockAlerts.filter(a => !a.resolved && !dismissedAlerts.includes(a.id))
@@ -75,21 +76,7 @@ export default function MapPage() {
   }
 
   // 2. Waiting for permission prompt
-  if (locationState === 'idle' || locationState === 'requesting') {
-    return (
-      <div className="flex flex-col h-screen bg-[#f7f6f2]">
-        <Navbar />
-        <div className="flex-1 flex flex-col items-center justify-center gap-4 px-4 text-center">
-          <div className="w-10 h-10 rounded-full border-[3px] border-[#dc2626] border-t-transparent animate-spin" />
-          <p className="text-sm font-medium text-[#555]">Requesting your location…</p>
-          <p className="text-xs text-[#aaa] max-w-xs">Allow location access in your browser to view nearby zones.</p>
-        </div>
-      </div>
-    )
-  }
-
-  // 3. Location denied — hard block, no map
-  if (locationState === 'denied') {
+  if (!hasGeolocation || locationDenied) {
     return (
       <div className="flex flex-col h-screen bg-[#f7f6f2]">
         <Navbar />
@@ -122,6 +109,19 @@ export default function MapPage() {
     )
   }
 
+  // 3. Waiting for location lock
+  if (!userCoords) {
+    return (
+      <div className="flex flex-col h-screen bg-[#f7f6f2]">
+        <Navbar />
+        <div className="flex-1 flex flex-col items-center justify-center gap-4 px-4 text-center">
+          <div className="w-10 h-10 rounded-full border-[3px] border-[#dc2626] border-t-transparent animate-spin" />
+          <p className="text-sm font-medium text-[#555]">Requesting your location…</p>
+          <p className="text-xs text-[#aaa] max-w-xs">Allow location access in your browser to view nearby zones.</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-[#f7f6f2]">
@@ -142,7 +142,7 @@ export default function MapPage() {
           <h1 className="text-sm font-semibold text-[#111]">Live Crowd Map</h1>
           <span className="flex items-center gap-1 text-[10px] text-[#888]">
             <span className="w-1.5 h-1.5 rounded-full bg-[#16a34a] animate-pulse" />
-            Updated {timeAgo(mockZones[0].updated_at)}
+            {zones[0] ? `Updated ${timeAgo(zones[0].updated_at)}` : zonesLoading ? 'Loading zones...' : 'No live zone data'}
           </span>
         </div>
         <div className="flex items-center gap-3">
@@ -163,13 +163,25 @@ export default function MapPage() {
       <div className="flex flex-1 overflow-hidden">
         {/* Map */}
         <div className="flex-1 relative">
-          <DynamicMap
-            zones={nearbyZones}
-            height="100%"
-            showAdmins={showAdmins}
-            center={userCoords ? [userCoords.lat, userCoords.lng] : undefined}
-            userLocation={userCoords ? [userCoords.lat, userCoords.lng] : undefined}
-          />
+          {zonesError && (
+            <div className="absolute top-3 left-3 z-20 bg-red-50 border border-red-200 rounded px-3 py-2 text-xs text-red-700">
+              {zonesError}
+            </div>
+          )}
+
+          {nearbyZones.length > 0 ? (
+            <DynamicMap
+              zones={nearbyZones}
+              height="100%"
+              showAdmins={showAdmins}
+              center={userCoords ? [userCoords.lat, userCoords.lng] : undefined}
+              userLocation={userCoords ? [userCoords.lat, userCoords.lng] : undefined}
+            />
+          ) : (
+            <div className="h-full w-full flex items-center justify-center bg-[#efefef] text-sm text-zinc-600">
+              {zonesLoading ? 'Loading nearby zones…' : 'No nearby zones found for your location.'}
+            </div>
+          )}
 
           {/* Legend overlay */}
           <div className="absolute bottom-4 left-4 bg-white border border-[#e4e4e4] rounded-lg p-3 shadow-sm z-10">
@@ -245,6 +257,9 @@ export default function MapPage() {
                   </p>
                 </div>
               ))}
+              {!zonesLoading && filteredZones.length === 0 && (
+                <p className="text-xs text-zinc-500 py-4 text-center">No nearby zones match your search.</p>
+              )}
             </div>
 
             {/* Active alerts */}

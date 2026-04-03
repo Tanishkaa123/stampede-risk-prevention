@@ -72,20 +72,14 @@ export default function LoginPage() {
     if (password.length < 6) { setError('Password must be at least 6 characters.'); return }
     setLoading(true)
 
-    const { data, error: authError } = await supabase.auth.signUp({
+    const { error: authError } = await supabase.auth.signUp({
       email,
       password,
       options: { data: { name: name.trim() } },
     })
     if (authError) { setLoading(false); setError(authError.message); return }
 
-    if (data.user) {
-      // Upsert in case the DB trigger already created the row
-      await supabase.from('profiles').upsert(
-        { id: data.user.id, name: name.trim(), email, role: 'user' } as any,
-        { onConflict: 'id' }
-      )
-    }
+    // Profile row is auto-created by database trigger on signup.
 
     setLoading(false)
     setSuccess('Account created! Check your email to confirm, then sign in.')

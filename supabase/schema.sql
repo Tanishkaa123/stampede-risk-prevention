@@ -12,7 +12,6 @@ drop table if exists public.broadcasts cascade;
 drop table if exists public.incidents  cascade;
 drop table if exists public.tasks      cascade;
 drop table if exists public.alerts     cascade;
-drop table if exists public.profiles   cascade;
 drop table if exists public.zones      cascade;
 
 drop function if exists public.update_updated_at cascade;
@@ -205,15 +204,15 @@ create trigger on_auth_user_created
 -- SEED DATA
 -- -----------------------------------------------
 insert into public.zones (name, status, density_percent, capacity, current_count, lat, lng, radius) values
-  ('Main Gate A',   'red',    91, 500, 455, 28.6139, 77.2090, 200),
-  ('Central Plaza', 'yellow', 67, 800, 536, 28.6160, 77.2110, 300),
-  ('East Corridor', 'green',  30, 400, 120, 28.6120, 77.2140, 180),
-  ('West Exit',     'green',  22, 300,  66, 28.6145, 77.2060, 150),
-  ('Food Court',    'yellow', 59, 600, 354, 28.6170, 77.2075, 220);
+  ('Food Street', 'red',    91, 500, 455, 16.4936691, 80.4983456, 80),
+  ('CB',          'yellow', 67, 800, 536, 16.4943535, 80.4991899, 80),
+  ('AB1',         'green',  30, 400, 120, 16.4957750, 80.5004053, 80),
+  ('AB2',         'green',  22, 300,  66, 16.4957371, 80.4981280, 80),
+  ('Rock Plaza',  'yellow', 59, 600, 354, 16.4949631, 80.4979211, 80);
 
 insert into public.alerts (type, zone_name, message, severity) values
-  ('stampede_risk',    'Main Gate A',   'Crowd density exceeded 90%. Risk of stampede. Redirect crowd immediately.', 'critical'),
-  ('red_zone',         'Main Gate A',   'Zone classified RED. Restrict further entry.',                              'high'),
-  ('medical_emergency','Central Plaza', 'Medical emergency near fountain. Medical team deployed.',                   'high'),
-  ('lost_child',       'East Corridor', 'Lost child — Age 7, red shirt. Last seen East Corridor.',                  'medium');
+  ('stampede_risk',    'Food Street',      'Crowd density exceeded 90%. Risk of stampede. Redirect crowd immediately.', 'critical'),
+  ('red_zone',         'Food Street',      'Zone classified RED. Restrict further entry.',                              'high'),
+  ('medical_emergency','CB',               'Medical emergency near main corridor. Medical team deployed.',              'high'),
+  ('lost_child',       'AB1',              'Lost child - Age 7, red shirt. Last seen AB1.',                            'medium');
 

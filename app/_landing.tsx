@@ -8,6 +8,7 @@ import { mockZones, mockAlerts } from '@/lib/mockData'
 import { AlertTriangle, Map, ShieldCheck, Route, Bell, Users, Activity, Lock, Eye, EyeOff, CheckCircle } from 'lucide-react'
 import ZoneBadge from '@/components/ZoneBadge'
 import { supabase } from '@/lib/supabase'
+import { useLiveZones } from '@/lib/useLiveZones'
 import type { Session } from '@supabase/supabase-js'
 
 type Role = 'user' | 'admin' | 'superadmin'
@@ -73,6 +74,7 @@ type Mode = 'signin' | 'signup'
 
 export default function LandingPage() {
   const router = useRouter()
+  const { zones: liveZones } = useLiveZones()
   const [session, setSession] = useState<Session | null>(null)
   const [role, setRole] = useState<Role>('user')
   const [mode, setMode] = useState<Mode>('signin')
@@ -132,20 +134,14 @@ export default function LandingPage() {
     if (password.length < 6) { setLoginError('Password must be at least 6 characters.'); return }
     setLoading(true)
 
-    const { data, error: authError } = await supabase.auth.signUp({
+    const { error: authError } = await supabase.auth.signUp({
       email,
       password,
       options: { data: { name: name.trim() } },
     })
     if (authError) { setLoading(false); setLoginError(authError.message); return }
 
-    if (data.user) {
-      // Upsert in case the DB trigger already created the row
-      await supabase.from('profiles').upsert(
-        { id: data.user.id, name: name.trim(), email, role: 'user' } as any,
-        { onConflict: 'id' }
-      )
-    }
+    // Profile row is auto-created by database trigger on signup.
 
     setLoading(false)
     setSuccess('Account created! Check your email to confirm, then sign in.')
@@ -156,8 +152,9 @@ export default function LandingPage() {
 
   const isSignUp = mode === 'signup' && role === 'user'
 
-  const redCount = mockZones.filter(z => z.status === 'red').length
-  const greenCount = mockZones.filter(z => z.status === 'green').length
+  const zones = liveZones.length > 0 ? liveZones : mockZones
+  const redCount = zones.filter(z => z.status === 'red').length
+  const greenCount = zones.filter(z => z.status === 'green').length
   const activeAlerts = mockAlerts.filter(a => !a.resolved).length
 
   return (
@@ -168,7 +165,7 @@ export default function LandingPage() {
       {activeAlerts > 0 && (
         <div className="bg-[#dc2626] text-white px-4 py-2 flex items-center justify-center gap-2 text-xs font-medium">
           <AlertTriangle size={13} />
-          {activeAlerts} active alert{activeAlerts > 1 ? 's' : ''} right now — Main Gate A is at critical density
+          {activeAlerts} active alert{activeAlerts > 1 ? 's' : ''} right now - Food Street is at critical density
           <Link href="/map" className="underline ml-1 opacity-80 hover:opacity-100">View Map</Link>
         </div>
       )}

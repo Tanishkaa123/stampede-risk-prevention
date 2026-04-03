@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import AdminSidebar from '@/components/AdminSidebar'
 import StatCard from '@/components/StatCard'
 import ZoneBadge from '@/components/ZoneBadge'
@@ -8,34 +8,56 @@ import PerformanceTable from '@/components/PerformanceTable'
 import BroadcastPanel from '@/components/BroadcastPanel'
 import DynamicMap from '@/components/DynamicMap'
 import { AlertItem } from '@/components/AlertBanner'
-import { mockZones, mockAlerts, mockAdmins } from '@/lib/mockData'
-import { Edit3, CheckCircle } from 'lucide-react'
-
-type ZoneStatus = 'green' | 'yellow' | 'red'
-
-interface ZoneEdit {
-  status: ZoneStatus
-  density: number
-}
+import { mockAlerts, mockAdmins } from '@/lib/mockData'
+import { CheckCircle, Edit3, Minus, Plus } from 'lucide-react'
+import { useLiveZones } from '@/lib/useLiveZones'
+import { clampDensity, getZoneStatusFromDensity, updateZoneDensity } from '@/lib/zones'
 
 export default function SuperAdminPage() {
-  const [zoneEdits, setZoneEdits] = useState<Record<string, ZoneEdit>>({})
-  const [saving, setSaving] = useState<string | null>(null)
-  const [selectedZone, setSelectedZone] = useState(mockZones[0])
+  const { zones, loading: zonesLoading, error: zonesError } = useLiveZones()
 
-  const zones = mockZones.map(z => ({
-    ...z,
-    status: (zoneEdits[z.id]?.status ?? z.status),
-    density_percent: zoneEdits[z.id]?.density ?? z.density_percent,
-  }))
+  const [saving, setSaving] = useState<string | null>(null)
+  const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null)
+  const [draftDensity, setDraftDensity] = useState(0)
+  const [saveMessage, setSaveMessage] = useState('')
 
   const activeAlerts = mockAlerts.filter(a => !a.resolved)
   const onlineAdmins = mockAdmins.filter(a => a.online)
 
+  const selectedZone = zones.find(zone => zone.id === selectedZoneId) ?? null
+
+  useEffect(() => {
+    if (!zones.length) return
+
+    const selectedStillExists = selectedZoneId && zones.some(zone => zone.id === selectedZoneId)
+    if (!selectedStillExists) {
+      setSelectedZoneId(zones[0].id)
+      setDraftDensity(zones[0].density_percent)
+      return
+    }
+
+    const latestSelected = zones.find(zone => zone.id === selectedZoneId)
+    if (latestSelected) {
+      setDraftDensity(latestSelected.density_percent)
+    }
+  }, [zones, selectedZoneId])
+
+  const draftStatus = getZoneStatusFromDensity(draftDensity)
+
   const handleZoneSave = async (zoneId: string) => {
+    const zone = zones.find(z => z.id === zoneId)
+    if (!zone) return
+
     setSaving(zoneId)
-    await new Promise(r => setTimeout(r, 800))
-    setSaving(null)
+    setSaveMessage('')
+    try {
+      await updateZoneDensity(zone, draftDensity)
+      setSaveMessage('Density updated live for all users.')
+    } catch (err) {
+      setSaveMessage(err instanceof Error ? err.message : 'Failed to update zone density.')
+    } finally {
+      setSaving(null)
+    }
   }
 
   return (
@@ -94,10 +116,18 @@ export default function SuperAdminPage() {
               <div className="bg-[#161616] border border-[#262626] rounded-lg overflow-hidden" style={{ height: '360px' }}>
                 <div className="px-4 py-3 border-b border-[#222] flex items-center justify-between">
                   <h2 className="text-white text-sm font-semibold">Control Map</h2>
-                  <span className="text-[10px] text-[#555]">Click zone to manage</span>
+                  <span className="text-[10px] text-[#555]">
+                    {zonesLoading ? 'Loading zones...' : `${zones.length} live zones`}
+                  </span>
                 </div>
                 <div style={{ height: 'calc(100% - 45px)' }}>
-                  <DynamicMap zones={zones} showAdmins admins={mockAdmins} height="100%" />
+                  {zones.length > 0 ? (
+                    <DynamicMap zones={zones} showAdmins admins={mockAdmins} height="100%" />
+                  ) : (
+                    <div className="h-full w-full flex items-center justify-center text-sm text-zinc-500">
+                      {zonesLoading ? 'Loading live map…' : 'No zones found in database.'}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -113,82 +143,102 @@ export default function SuperAdminPage() {
                   {zones.map(zone => (
                     <button
                       key={zone.id}
-                      onClick={() => setSelectedZone(zone)}
+                      onClick={() => {
+                        setSelectedZoneId(zone.id)
+                        setDraftDensity(zone.density_percent)
+                        setSaveMessage('')
+                      }}
                       className={`w-full px-4 py-2.5 flex items-center justify-between text-left border-b border-[#1e1e1e] last:border-0 transition-colors
-                        ${selectedZone.id === zone.id ? 'bg-[#1e1e1e]' : 'hover:bg-[#1a1a1a]'}`}
+                        ${selectedZone?.id === zone.id ? 'bg-[#1e1e1e]' : 'hover:bg-[#1a1a1a]'}`}
                     >
                       <span className="text-xs text-[#ccc]">{zone.name}</span>
                       <ZoneBadge status={zone.status} size="sm" />
                     </button>
                   ))}
+                  {!zonesLoading && zones.length === 0 && (
+                    <p className="px-4 py-6 text-xs text-zinc-500">No zones are available.</p>
+                  )}
                 </div>
 
                 {/* Edit panel for selected zone */}
                 <div className="p-4 border-t border-[#222]">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Edit3 size={12} className="text-[#555]" />
-                    <p className="text-[#888] text-xs font-medium">{selectedZone.name}</p>
-                  </div>
+                  {selectedZone ? (
+                    <>
+                      <div className="flex items-center gap-2 mb-3">
+                        <Edit3 size={12} className="text-[#555]" />
+                        <p className="text-[#888] text-xs font-medium">{selectedZone.name}</p>
+                      </div>
 
-                  <div className="space-y-3">
-                    <div>
-                      <label className="block text-[10px] uppercase tracking-widest text-[#555] mb-1.5 font-medium">
-                        Zone Status
-                      </label>
-                      <select
-                        value={zoneEdits[selectedZone.id]?.status ?? selectedZone.status}
-                        onChange={e => setZoneEdits(prev => ({
-                          ...prev, [selectedZone.id]: {
-                            ...prev[selectedZone.id],
-                            status: e.target.value as ZoneStatus,
-                            density: prev[selectedZone.id]?.density ?? selectedZone.density_percent,
-                          }
-                        }))}
-                        className="w-full bg-[#111] border border-[#333] rounded text-[#ccc] text-xs px-3 py-2 focus:outline-none focus:border-[#555]"
-                      >
-                        <option value="green">Green — Safe</option>
-                        <option value="yellow">Yellow — Moderate</option>
-                        <option value="red">Red — Danger</option>
-                      </select>
-                    </div>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <p className="text-[10px] uppercase tracking-widest text-[#555] font-medium">Live Status</p>
+                          <ZoneBadge status={draftStatus} size="sm" />
+                        </div>
 
-                    <div>
-                      <label className="block text-[10px] uppercase tracking-widest text-[#555] mb-1.5 font-medium">
-                        Crowd Density: {zoneEdits[selectedZone.id]?.density ?? selectedZone.density_percent}%
-                      </label>
-                      <input
-                        type="range"
-                        min={0}
-                        max={100}
-                        value={zoneEdits[selectedZone.id]?.density ?? selectedZone.density_percent}
-                        onChange={e => setZoneEdits(prev => ({
-                          ...prev, [selectedZone.id]: {
-                            ...prev[selectedZone.id],
-                            status: prev[selectedZone.id]?.status ?? selectedZone.status,
-                            density: Number(e.target.value),
-                          }
-                        }))}
-                        className="w-full accent-[#dc2626]"
-                      />
-                    </div>
+                        <div>
+                          <label className="block text-[10px] uppercase tracking-widest text-[#555] mb-1.5 font-medium">
+                            Crowd Density: {draftDensity}%
+                          </label>
+                          <div className="flex items-center gap-2 mb-2">
+                            <button
+                              type="button"
+                              onClick={() => setDraftDensity(prev => clampDensity(prev - 5))}
+                              className="h-8 w-8 rounded bg-[#111] border border-[#333] text-zinc-300 hover:bg-[#1d1d1d] flex items-center justify-center"
+                            >
+                              <Minus size={12} />
+                            </button>
+                            <input
+                              type="range"
+                              min={0}
+                              max={100}
+                              value={draftDensity}
+                              onChange={e => setDraftDensity(clampDensity(Number(e.target.value)))}
+                              className="flex-1 accent-[#dc2626]"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setDraftDensity(prev => clampDensity(prev + 5))}
+                              className="h-8 w-8 rounded bg-[#111] border border-[#333] text-zinc-300 hover:bg-[#1d1d1d] flex items-center justify-center"
+                            >
+                              <Plus size={12} />
+                            </button>
+                          </div>
+                          <p className="text-[10px] text-zinc-500">
+                            Under 70% = green, 70% and above = red.
+                          </p>
+                        </div>
 
-                    <button
-                      onClick={() => handleZoneSave(selectedZone.id)}
-                      disabled={saving === selectedZone.id}
-                      className={`flex items-center justify-center gap-1.5 w-full py-2 rounded text-xs font-medium transition-colors
-                        ${saving === selectedZone.id
-                          ? 'bg-[#16a34a] text-white'
-                          : 'bg-[#dc2626] text-white hover:bg-[#b91c1c]'}`}
-                    >
-                      {saving === selectedZone.id ? (
-                        <><CheckCircle size={12} /> Saved</>
-                      ) : 'Update Zone'}
-                    </button>
-                  </div>
+                        <button
+                          onClick={() => handleZoneSave(selectedZone.id)}
+                          disabled={saving === selectedZone.id}
+                          className={`flex items-center justify-center gap-1.5 w-full py-2 rounded text-xs font-medium transition-colors
+                            ${saving === selectedZone.id
+                              ? 'bg-[#16a34a] text-white'
+                              : 'bg-[#dc2626] text-white hover:bg-[#b91c1c]'}`}
+                        >
+                          {saving === selectedZone.id ? (
+                            <><CheckCircle size={12} /> Updating...</>
+                          ) : 'Update Zone'}
+                        </button>
+
+                        {saveMessage && (
+                          <p className="text-[11px] text-zinc-400">{saveMessage}</p>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-xs text-zinc-500">Select a zone to manage density.</p>
+                  )}
                 </div>
               </div>
             </div>
           </div>
+
+          {(zonesError || saveMessage.toLowerCase().includes('failed')) && (
+            <div className="bg-red-950/40 border border-red-900 rounded-lg p-3 text-xs text-red-300">
+              {zonesError || saveMessage}
+            </div>
+          )}
 
           {/* Broadcast + Alerts */}
           <div className="grid lg:grid-cols-2 gap-6">

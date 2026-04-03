@@ -32,7 +32,7 @@ export default function AdminPage() {
       <AdminSidebar
         role="admin"
         userName="Rajan Sharma"
-        zoneName="Main Gate A"
+        zoneName="Food Street"
       />
 
       <main className="flex-1 overflow-y-auto">

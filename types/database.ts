@@ -15,6 +15,7 @@ export type Database = {
         }
         Insert: Omit<Database['public']['Tables']['profiles']['Row'], 'created_at'>
         Update: Partial<Database['public']['Tables']['profiles']['Insert']>
+        Relationships: []
       }
       zones: {
         Row: {
@@ -31,6 +32,7 @@ export type Database = {
         }
         Insert: Omit<Database['public']['Tables']['zones']['Row'], 'updated_at'>
         Update: Partial<Database['public']['Tables']['zones']['Insert']>
+        Relationships: []
       }
       alerts: {
         Row: {
@@ -45,6 +47,7 @@ export type Database = {
         }
         Insert: Omit<Database['public']['Tables']['alerts']['Row'], 'id' | 'created_at'>
         Update: Partial<Database['public']['Tables']['alerts']['Insert']>
+        Relationships: []
       }
       tasks: {
         Row: {
@@ -60,6 +63,7 @@ export type Database = {
         }
         Insert: Omit<Database['public']['Tables']['tasks']['Row'], 'id' | 'created_at' | 'responded_at'>
         Update: Partial<Database['public']['Tables']['tasks']['Insert']>
+        Relationships: []
       }
       incidents: {
         Row: {
@@ -73,6 +77,7 @@ export type Database = {
         }
         Insert: Omit<Database['public']['Tables']['incidents']['Row'], 'id' | 'created_at'>
         Update: Partial<Database['public']['Tables']['incidents']['Insert']>
+        Relationships: []
       }
       broadcasts: {
         Row: {
@@ -85,7 +90,12 @@ export type Database = {
         }
         Insert: Omit<Database['public']['Tables']['broadcasts']['Row'], 'id' | 'created_at'>
         Update: Partial<Database['public']['Tables']['broadcasts']['Insert']>
+        Relationships: []
       }
     }
+    Views: Record<string, never>
+    Functions: Record<string, never>
+    Enums: Record<string, never>
+    CompositeTypes: Record<string, never>
   }
 }
