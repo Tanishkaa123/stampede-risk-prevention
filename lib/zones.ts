@@ -34,7 +34,8 @@ export async function fetchZones(): Promise<Zone[]> {
     .order('name', { ascending: true })
 
   if (error) throw error
-  return (data ?? []).map(normalizeZone)
+  const rows = (data ?? []) as ZoneRow[]
+  return rows.map(normalizeZone)
 }
 
 export async function updateZoneDensity(zone: Zone, nextDensity: number): Promise<void> {
