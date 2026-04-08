@@ -151,7 +151,6 @@ export default function ZoneDangerNotifier({ zones, userCoords = null }: ZoneDan
       new Notification('High Crowd Density Alert', {
         body: `${userZone.name} is at ${Math.round(userZone.density_percent)}% density. Move to a safer route now.`,
         tag: `zone-danger-${userZone.id}`,
-        renotify: true,
       })
     }
   }, [permission, playBeep, userZone])
