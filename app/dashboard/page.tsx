@@ -9,6 +9,7 @@ import { mockAlerts, mockRoutes } from '@/lib/mockData'
 import { MapPin, Navigation, RefreshCw } from 'lucide-react'
 import Link from 'next/link'
 import { useLiveZones } from '@/lib/useLiveZones'
+import ZoneDangerNotifier from '@/components/ZoneDangerNotifier'
 
 export default function DashboardPage() {
   const checking = useRequireAuth()
@@ -27,6 +28,7 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-[#f7f6f2]">
       <Navbar />
+      <ZoneDangerNotifier zones={zones} />
 
       {/* Status banner */}
       {userZone ? (

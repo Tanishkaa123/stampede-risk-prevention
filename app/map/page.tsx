@@ -10,6 +10,7 @@ import { mockAlerts, timeAgo } from '@/lib/mockData'
 import { Layers, Search, X, MapPin } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useLiveZones } from '@/lib/useLiveZones'
+import ZoneDangerNotifier from '@/components/ZoneDangerNotifier'
 
 function haversine(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371
@@ -126,6 +127,7 @@ export default function MapPage() {
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-[#f7f6f2]">
       <Navbar />
+      <ZoneDangerNotifier zones={zones} userCoords={userCoords} />
 
       {/* Alert banners */}
       {activeAlerts.filter(a => a.severity === 'critical').slice(0, 1).map(alert => (
